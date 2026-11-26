@@ -685,7 +685,7 @@
         if (!cond) { ok = false; first = first || el; }
       }
       var dg = $('#oPhone').value.replace(/\D/g, '');
-      if (/^380380/.test(dg)) dg = dg.slice(3);
+      if (/^380380/.test(dg)) dg = dg.slice(3); if (/^3800\d{9}$/.test(dg)) dg = '380' + dg.slice(4);
       if (/^0\d{9}$/.test(dg)) dg = '38' + dg;
       var phone = '+' + dg;
       if (/^\+380\d{9}$/.test(phone)) $('#oPhone').value = phone;
