@@ -67,7 +67,7 @@
   /* ---------- Сховище ---------- */
   function load(k, def) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? def : v; } catch (e) { return def; } }
   function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* приватний режим */ } }
-  var cart = load('florida_cart', []).filter(function (l) { return byId(l.id); });
+  var cart = load('florida_cart', []).filter(function (l) { var p = byId(l.id); return p && !p.sold; });
   var favs = load('florida_favs', []).filter(byId);
 
   function cartQty() { return cart.reduce(function (s, l) { return s + l.qty; }, 0); }
@@ -81,9 +81,10 @@
     $('#cartCount').parentNode.setAttribute('aria-label', 'Кошик' + (cartQty() ? ': ' + goods(cartQty()) : ''));
     $('#favCount').parentNode.setAttribute('aria-label', 'Обране' + (favs.length ? ': ' + goods(favs.length) : ''));
   }
-  function addToCart(id, vi) {
-    var l = cart.filter(function (x) { return x.id === id && x.v === vi; })[0];
-    if (l) l.qty++; else cart.push({ id: id, v: vi, qty: 1 });
+  function addToCart(id, vi, size) {
+    size = size || '';
+    var l = cart.filter(function (x) { return x.id === id && x.v === vi && (x.s || '') === size; })[0];
+    if (l) l.qty++; else cart.push({ id: id, v: vi, s: size, qty: 1 });
     save('florida_cart', cart); syncBadges();
     toast('Додано в кошик', '#cart', 'Перейти');
   }
@@ -174,15 +175,16 @@
   /* ---------- Картка товару ---------- */
   function card(p) {
     var v = variantsOf(p), main = p.images[0], alt = p.images[1];
+    var sizes = p.sizes && p.sizes.length ? '<div class="card__sizes">Розміри: ' + esc(p.sizes.join(', ')) + '</div>' : '';
     var isFav = favs.indexOf(p.id) > -1;
-    return '<article class="card">' +
+    return '<article class="card' + (p.sold ? ' is-sold' : '') + '">' +
       '<a class="card__media" href="#product/' + p.id + '" tabindex="-1" aria-hidden="true">' +
       img(main, '', { cls: 'main' + (alt ? ' has-alt' : '') }) + (alt ? img(alt, '', { cls: 'alt' }) : '') + '</a>' +
-      (p.isNew ? '<span class="tag">Новинка</span>' : '') +
+      (p.sold ? '<span class="tag tag--sold">Продано</span>' : p.isNew ? '<span class="tag">Новинка</span>' : '') +
       '<button class="fav-btn" type="button" data-fav="' + p.id + '" aria-pressed="' + isFav + '" aria-label="В обране: ' + esc(p.brand + ' ' + p.name) + '">' + icon('heart', 20) + '</button>' +
       '<div class="card__body"><div class="card__brand">' + esc(p.brand) + '</div>' +
       '<h3 class="card__name"><a href="#product/' + p.id + '">' + esc(p.name) + '</a></h3>' +
-      '<div class="card__price">Ціна за запитом</div>' +
+      '<div class="card__price">' + (p.sold ? 'Продано' : 'Ціна за запитом') + '</div>' + (p.sold ? '' : sizes) +
       (v.length > 1 ? '<div class="card__dots" aria-label="Кольори: ' + esc(v.map(function (x) { return x.color; }).join(', ')) + '">' + v.map(function (x) { return '<span class="dot" style="background:' + D.COLORS[x.colorFamily].hex + '"></span>'; }).join('') + '</div>' : '') +
       '</div></article>';
   }
@@ -316,7 +318,7 @@
     var b = route.brand ? brandBySlug(route.brand) : null;
     if (route.brand && !b) return notFound(app);
     var c = cat(route.cat), s = sub(c, route.sub);
-    F = { cat: route.cat || '', sub: route.sub || '', brands: b ? [b.name] : [], colors: [], isNew: !!route.isNew, sort: 'new' };
+    F = { cat: route.cat || '', sub: route.sub || '', brands: b ? [b.name] : [], colors: [], isNew: !!route.isNew, inStock: false, sort: 'new' };
     var title = s ? s.name : c ? c.name : b ? b.name : route.isNew ? 'Новинки' : 'Каталог';
     var cr = [['Каталог', '#catalog']];
     if (c) cr.push([c.name, '#' + c.slug]);
@@ -357,6 +359,7 @@
       if (ignore !== 'brand' && F.brands.length && F.brands.indexOf(p.brand) < 0) return false;
       if (ignore !== 'color' && F.colors.length && !families(p).some(function (f) { return F.colors.indexOf(f) > -1; })) return false;
       if (ignore !== 'new' && F.isNew && !p.isNew) return false;
+      if (F.inStock && p.sold) return false;
       return true;
     });
   }
@@ -377,7 +380,8 @@
     return '<div class="fgroup"><h3>Категорія</h3><a class="fopt" href="#catalog"' + (!F.cat ? ' style="font-weight:600"' : '') + '>Усі категорії<small>' + P.length + '</small></a>' + catCounts + '</div>' +
       '<div class="fgroup"><h3>Бренд</h3>' + (brandsH || '<p class="small">Немає брендів для цього вибору</p>') + '</div>' +
       '<div class="fgroup"><h3>Колір</h3><div class="swatches">' + colorsH + '</div></div>' +
-      '<div class="fgroup"><label class="toggle" for="' + pre + 'New"><span>Лише новинки</span><input type="checkbox" id="' + pre + 'New" data-f="new"' + (F.isNew ? ' checked' : '') + '><span class="toggle__ui" aria-hidden="true"></span></label></div>' +
+      '<div class="fgroup"><label class="toggle" for="' + pre + 'New"><span>Лише новинки</span><input type="checkbox" id="' + pre + 'New" data-f="new"' + (F.isNew ? ' checked' : '') + '><span class="toggle__ui" aria-hidden="true"></span></label>' +
+      '<label class="toggle" for="' + pre + 'Stock"><span>Лише в наявності</span><input type="checkbox" id="' + pre + 'Stock" data-f="stock"' + (F.inStock ? ' checked' : '') + '><span class="toggle__ui" aria-hidden="true"></span></label></div>' +
       '<div class="fgroup" style="border:0"><button class="btn btn--ghost btn--block" type="button" data-reset>Скинути все</button></div>';
   }
   function sorted(list) {
@@ -385,6 +389,7 @@
     if (F.sort === 'name') l.sort(function (a, b) { return a.name.localeCompare(b.name, 'uk'); });
     else if (F.sort === 'brand') l.sort(function (a, b) { return a.brand.localeCompare(b.brand, 'en', { sensitivity: 'base' }) || a.name.localeCompare(b.name, 'uk'); });
     else l.sort(function (a, b) { return (b.isNew - a.isNew) || a.code.localeCompare(b.code); });
+    l.sort(function (a, b) { return (!!a.sold) - (!!b.sold); });
     return l;
   }
   function updateCatalog() {
@@ -400,6 +405,7 @@
     F.brands.forEach(function (n) { pills.push(['brand', n, n]); });
     F.colors.forEach(function (k) { pills.push(['color', k, D.COLORS[k].name]); });
     if (F.isNew) pills.push(['new', '1', 'Лише новинки']);
+    if (F.inStock) pills.push(['stock', '1', 'Лише в наявності']);
     $('#fPills').innerHTML = pills.map(function (x) { return '<span class="pill">' + esc(x[2]) + '<button type="button" data-rm="' + x[0] + '" data-v="' + esc(x[1]) + '" aria-label="Прибрати фільтр ' + esc(x[2]) + '">' + icon('close', 14) + '</button></span>'; }).join('') +
       (pills.length > 1 ? '<button class="link" type="button" data-reset style="border:0;background:none">Скинути все</button>' : '');
     $('#fGrid').innerHTML = list.length ? list.map(card).join('') : '';
@@ -410,6 +416,7 @@
     var t = e.target; if (!t.dataset || !t.dataset.f) return;
     if (t.dataset.f === 'brand') { var i = F.brands.indexOf(t.value); if (t.checked && i < 0) F.brands.push(t.value); if (!t.checked && i > -1) F.brands.splice(i, 1); }
     if (t.dataset.f === 'new') F.isNew = t.checked;
+    if (t.dataset.f === 'stock') F.inStock = t.checked;
     updateCatalog();
   }
   function onFilterClick(e) {
@@ -420,9 +427,10 @@
       if (t.dataset.rm === 'brand') F.brands = F.brands.filter(function (x) { return x !== v; });
       if (t.dataset.rm === 'color') F.colors = F.colors.filter(function (x) { return x !== v; });
       if (t.dataset.rm === 'new') F.isNew = false;
+      if (t.dataset.rm === 'stock') F.inStock = false;
     }
     if (t.hasAttribute('data-reset')) {
-      F.brands = []; F.colors = []; F.isNew = false;
+      F.brands = []; F.colors = []; F.isNew = false; F.inStock = false;
       if (route.brand || route.isNew || F.cat) { closeDrawer(true); location.hash = '#catalog'; return; }
     }
     updateCatalog();
@@ -453,11 +461,15 @@
       '<div class="variants" role="group" aria-label="Колір">' + vs.map(function (v, i) {
         return '<button type="button" class="variant" data-vi="' + i + '" aria-pressed="' + (i === vi) + '"><span class="dot" style="background:' + D.COLORS[v.colorFamily].hex + '"></span>' + esc(v.color) + '</button>';
       }).join('') + '</div>' +
-      '<div class="pinfo__actions"><button class="btn" type="button" id="pAdd">' + icon('bag', 18) + ' Додати в кошик</button>' +
+      (p.sizes && p.sizes.length && !p.sold ? '<p class="pinfo__label" id="sizeLbl">Розмір: <span id="pSize">оберіть розмір</span></p><div class="variants sizes" role="group" aria-labelledby="sizeLbl">' +
+        p.sizes.map(function (z) { return '<button type="button" class="variant size" data-size="' + esc(z) + '" aria-pressed="false">' + esc(z) + '</button>'; }).join('') +
+        '</div><p class="field__err" id="sizeErr" aria-live="polite"></p>' + (p.sizeNote ? '<p class="small">' + esc(p.sizeNote) + '</p>' : '') : '') +
+      (p.sold ? '<div class="avail avail--sold"><span class="avail__dot" aria-hidden="true"></span><div><b style="font-weight:500">Цю модель уже продано</b><br><span class="muted">Більшість речей у нас в єдиному екземплярі. Напишіть у Direct — підберемо схожу.</span></div></div>' : '') +
+      '<div class="pinfo__actions"><button class="btn" type="button" id="pAdd"' + (p.sold ? ' disabled' : '') + '>' + icon('bag', 18) + (p.sold ? ' Продано' : ' Додати в кошик') + '</button>' +
       '<button class="btn btn--ghost" type="button" data-fav="' + p.id + '" data-label="1" aria-pressed="' + isFav + '">' + icon('heart', 18) + '<span>' + (isFav ? 'В обраному' : 'В обране') + '</span></button>' +
-      '<a class="btn btn--accent btn--direct" id="pDirect" href="' + DIRECT + '" target="_blank" rel="noopener">' + icon('send', 18) + ' Замовити в Direct</a></div>' +
+      '<a class="btn btn--accent btn--direct" id="pDirect" href="' + DIRECT + '" target="_blank" rel="noopener">' + icon('send', 18) + (p.sold ? ' Запитати про схожу' : ' Замовити в Direct') + '</a></div>' +
       '<p class="small" style="margin-top:8px">Натискаючи «Замовити в Direct», ми скопіюємо текст запиту — просто вставте його в повідомлення.</p>' +
-      '<div class="avail"><span class="avail__dot" aria-hidden="true"></span><div><b style="font-weight:500">Наявність у магазинах</b><br><span class="muted">Хуст, вул. Львівська, 159 · Тячів, вул. Кошута, 26. Перед візитом уточніть наявність моделі в Direct.</span></div></div>' +
+      (p.sold ? '' : '<div class="avail"><span class="avail__dot" aria-hidden="true"></span><div><b style="font-weight:500">Наявність у магазинах</b><br><span class="muted">Хуст, вул. Львівська, 159 · Тячів, вул. Кошута, 26. Перед візитом уточніть наявність моделі в Direct.</span></div></div>') +
       '<div class="acc">' +
       accItem('desc', 'Опис', '<p>' + esc(p.description) + '</p>', true) +
       accItem('spec', 'Характеристики', '<dl class="specs"><dt>Бренд</dt><dd><a href="#brand/' + b.slug + '" style="text-decoration:underline">' + esc(p.brand) + '</a></dd><dt>Категорія</dt><dd>' + esc(catName(p)) + '</dd><dt>Колір</dt><dd id="pColor2">' + esc(vs[vi].color) + '</dd><dt>Код товару</dt><dd>' + esc(p.code) + '</dd></dl>') +
@@ -469,18 +481,30 @@
 
     G = { p: p, vi: vi, idx: 0 };
     renderGallery();
-    $$('.variant', app).forEach(function (btn) {
+    $$('.variant[data-vi]', app).forEach(function (btn) {
       btn.addEventListener('click', function () {
         G.vi = +btn.dataset.vi; G.idx = 0;
-        $$('.variant', app).forEach(function (x) { x.setAttribute('aria-pressed', x === btn); });
+        $$('.variant[data-vi]', app).forEach(function (x) { x.setAttribute('aria-pressed', x === btn); });
         $('#pColor').textContent = $('#pColor2').textContent = vs[G.vi].color;
         history.replaceState(null, '', '#product/' + p.id + (G.vi ? '/' + G.vi : ''));
         renderGallery();
       });
     });
-    $('#pAdd').addEventListener('click', function () { addToCart(p.id, G.vi); });
+    G.size = '';
+    $$('.size', app).forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        G.size = btn.dataset.size;
+        $$('.size', app).forEach(function (x) { x.setAttribute('aria-pressed', x === btn); });
+        $('#pSize').textContent = G.size; $('#sizeErr').textContent = '';
+      });
+    });
+    $('#pAdd').addEventListener('click', function () {
+      if (p.sold) return;
+      if (p.sizes && p.sizes.length && !G.size) { $('#sizeErr').textContent = 'Оберіть розмір'; var f = $('.size', app); if (f) f.focus(); return; }
+      addToCart(p.id, G.vi, G.size);
+    });
     $('#pDirect').addEventListener('click', function () {
-      copyText('Вітаю! Цікавить ' + p.brand + ' — ' + p.name + ' (' + vs[G.vi].color + '), код ' + p.code + '. Підкажіть, будь ласка, ціну та наявність.');
+      copyText('Вітаю! Цікавить ' + p.brand + ' — ' + p.name + ' (' + vs[G.vi].color + (G.size ? ', розмір ' + G.size : '') + '), код ' + p.code + '. ' + (p.sold ? 'Бачу, що її вже продано. Чи є щось схоже?' : 'Підкажіть, будь ласка, ціну та наявність.'));
     });
     $$('.acc__btn', app).forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -621,7 +645,7 @@
       var p = byId(l.id), v = variantsOf(p)[l.v] || variantsOf(p)[0];
       return '<div class="line"><a class="line__img" href="#product/' + p.id + (l.v ? '/' + l.v : '') + '">' + img(v.images[0], p.brand + ' ' + p.name, { w: 176, h: 220 }) + '</a>' +
         '<div><div class="card__brand">' + esc(p.brand) + '</div><a class="line__name" href="#product/' + p.id + (l.v ? '/' + l.v : '') + '">' + esc(p.name) + '</a>' +
-        '<div class="line__meta">Колір: ' + esc(v.color) + ' · ' + esc(p.code) + ' · Ціна за запитом</div>' +
+        '<div class="line__meta">Колір: ' + esc(v.color) + (l.s ? ' · Розмір: ' + esc(l.s) : '') + ' · ' + esc(p.code) + ' · Ціна за запитом</div>' +
         '<div class="line__row"><div class="qty" role="group" aria-label="Кількість"><button type="button" data-q="-1" data-i="' + i + '" aria-label="Зменшити кількість">−</button><output aria-live="polite">' + l.qty + '</output><button type="button" data-q="1" data-i="' + i + '" aria-label="Збільшити кількість">+</button></div>' +
         '<button class="remove" type="button" data-del="' + i + '">Видалити</button></div></div></div>';
     }).join('');
@@ -660,7 +684,11 @@
         el.setAttribute('aria-invalid', !cond); err.textContent = cond ? '' : msg;
         if (!cond) { ok = false; first = first || el; }
       }
-      var phone = $('#oPhone').value.replace(/[\s()\-]/g, '');
+      var dg = $('#oPhone').value.replace(/\D/g, '');
+      if (/^380380/.test(dg)) dg = dg.slice(3);
+      if (/^0\d{9}$/.test(dg)) dg = '38' + dg;
+      var phone = '+' + dg;
+      if (/^\+380\d{9}$/.test(phone)) $('#oPhone').value = phone;
       var np = f.ship.value === 'Нова пошта';
       check('oName', $('#oName').value.trim().length > 1, 'Вкажіть ім\'я');
       check('oPhone', /^\+380\d{9}$/.test(phone), 'Формат: +380 і 9 цифр, наприклад +380 67 123 45 67');
@@ -669,7 +697,7 @@
       save('florida_contact', { name: $('#oName').value.trim(), phone: phone, ig: $('#oIg').value.trim() });
       var lines = cart.map(function (l, i) {
         var p = byId(l.id), v = variantsOf(p)[l.v] || variantsOf(p)[0];
-        return (i + 1) + '. ' + p.brand + ' — ' + p.name + ' (колір: ' + v.color + '), код ' + p.code + ' — ' + l.qty + ' шт.';
+        return (i + 1) + '. ' + p.brand + ' — ' + p.name + ' (колір: ' + v.color + (l.s ? ', розмір: ' + l.s : '') + '), код ' + p.code + ' — ' + l.qty + ' шт.';
       });
       var text = 'Вітаю! Хочу оформити замовлення з сайту FLORIDA:\n\n' + lines.join('\n') +
         '\n\nІм\'я: ' + $('#oName').value.trim() + '\nТелефон: ' + phone +
@@ -768,7 +796,7 @@
     var toks = q.split(/\s+/).map(stem);
     var res = searchIndex.filter(function (x) { return toks.every(function (t) { return x.t.indexOf(t) > -1; }); }).map(function (x) { return x.p; });
     box.innerHTML = res.length ? res.slice(0, 8).map(function (p) {
-      return '<a class="sres" href="#product/' + p.id + '">' + img(p.images[0], '', { w: 112, h: 140 }) + '<span><small>' + esc(p.brand) + '</small><b>' + esc(p.name) + '</b><small>' + esc(p.color) + ' · Ціна за запитом</small></span></a>';
+      return '<a class="sres" href="#product/' + p.id + '">' + img(p.images[0], '', { w: 112, h: 140 }) + '<span><small>' + esc(p.brand) + '</small><b>' + esc(p.name) + '</b><small>' + esc(p.color) + (p.sold ? ' · Продано' : ' · Ціна за запитом') + '</small></span></a>';
     }).join('') + (res.length > 8 ? '<p class="search__empty">Ще ' + (res.length - 8) + ' — уточніть запит</p>' : '')
       : '<p class="search__empty">Нічого не знайдено за запитом «' + esc(q) + '». Спробуйте назву бренду або категорію.</p>';
     return res;

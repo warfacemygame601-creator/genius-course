@@ -5,6 +5,8 @@
    змініть id (латиницею, без пробілів), code (наступний FL-1xx) і решту полів.
    Фото кладіть у папку img/ з назвами <id>-1.jpg, <id>-2.jpg …
    Перше фото — головне (на білому фоні), друге показується при наведенні.
+   Продано: додайте sold: true — товар лишиться на сайті з позначкою «Продано».
+   Розміри (взуття): sizes: ['37', '38'] — покупець обере розмір перед додаванням у кошик.
    Детальна інструкція — у файлі README.md.
 
    Джерело всіх фото нижче: власні публікації магазину в Instagram
@@ -104,6 +106,7 @@ window.FLORIDA = (function () {
     { id: 'jc-velour-baguette', code: 'FL-104', brand: 'Juicy Couture', category: 'bags', subcategory: 'shoulder',
       name: 'Велюрова сумка-багет з короною', color: 'бордо', colorFamily: 'burgundy', isNew: false,
       description: 'Велюрова сумка-багет кольору бордо з вишитою короною та чорними вставками. Ремінець із ланцюжком і хутряний помпон-брелок.',
+      sold: true, // ДЛЯ ДЕМО позначки «Продано» — приберіть або поставте false, якщо товар є
       images: imgs('jc-velour-baguette', 2) },
 
     { id: 'jc-watch-set', code: 'FL-105', brand: 'Juicy Couture', category: 'accessories', subcategory: 'watches',
@@ -124,6 +127,8 @@ window.FLORIDA = (function () {
     { id: 'rb-sneakers', code: 'FL-108', brand: 'Reebok', category: 'shoes', subcategory: 'sneakers',
       name: 'Кросівки', color: 'молочні', colorFamily: 'white', isNew: true,
       description: 'Молочні кросівки на шнурівці з багатошаровим верхом. Світла підошва з бежевим кантом.',
+      // ПРИКЛАД розмірів для демо — замініть реальними наявними розмірами
+      sizes: ['36', '37', '38', '39', '40'], sizeNote: 'Розмірна сітка EU. Наявність розміру підтвердимо в Direct.',
       images: imgs('rb-sneakers', 2) },
 
     { id: 'sm-logo-backpack', code: 'FL-109', brand: 'Steve Madden', category: 'backpacks', subcategory: 'city',
@@ -188,6 +193,8 @@ window.FLORIDA = (function () {
     { id: 'karl-slippers', code: 'FL-120', brand: 'Karl Lagerfeld', category: 'shoes', subcategory: 'home',
       name: 'Домашні капці з хутром', color: 'чорні', colorFamily: 'black', isNew: false,
       description: 'Чорні домашні капці з пухнастим хутром і смужкою з логотипом KARL LAGERFELD.',
+      // ПРИКЛАД розмірів для демо — замініть реальними
+      sizes: ['S (36–37)', 'M (38–39)', 'L (40–41)'], sizeNote: 'Наявність розміру підтвердимо в Direct.',
       images: imgs('karl-slippers', 2) },
 
     { id: 'mk-cap', code: 'FL-121', brand: 'Michael Kors', category: 'accessories', subcategory: 'hats',
